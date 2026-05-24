@@ -29,3 +29,44 @@ Optional CLASS/PyCLASS:
 ## Test
 
     bash test_api.sh http://127.0.0.1:8000
+
+## Render deployment
+
+This repository includes:
+
+- `Dockerfile`
+- `render.yaml`
+
+Recommended Render settings:
+
+- Service type: Web Service
+- Environment: Docker
+- Repository: `fujikix1102/dti-class-api`
+- Branch: `main`
+- Health check path: `/health`
+- Start command: handled by Dockerfile
+
+After deployment, check:
+
+    https://YOUR-RENDER-URL/health
+
+Expected response includes:
+
+    "status": "ok"
+
+If `classy_available` is `true`, CLASS/PyCLASS is available on the deployed backend.
+If `classy_available` is `false`, the API still works as a safe wrapper but does not run CLASS propagation.
+
+## Streamlit frontend connection
+
+The Streamlit frontend should later call:
+
+    POST https://YOUR-RENDER-URL/class/compute
+
+Boundary:
+
+- exploratory backend
+- non-canonical
+- not a likelihood evaluation
+- not a posterior comparison
+- not a Planck validation pipeline

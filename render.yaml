@@ -1,0 +1,10 @@
+services:
+  - type: web
+    name: dti-class-api
+    env: docker
+    plan: free
+    region: singapore
+    branch: main
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /health
+    autoDeploy: true
