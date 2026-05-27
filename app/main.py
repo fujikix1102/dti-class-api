@@ -43,6 +43,140 @@ def safe_float(x: Any) -> Optional[float]:
         pass
     return None
 
+
+# === DTI_CLASS_API_CMB_ARRAY_EXPORT_V1 ===
+# Backend response extension only.
+# This exports real CLASS/PyCLASS CMB arrays when CLASS provides them.
+# It does not evaluate Planck likelihoods, does not compare posteriors,
+# and does not activate AxiCLASS/EDE microphysics.
+
+def _dti_json_float_list_v1(value: Any) -> Optional[list]:
+    try:
+        if value is None:
+            return None
+        if hasattr(value, "tolist"):
+            value = value.tolist()
+        else:
+            value = list(value)
+        out = []
+        for x in value:
+            try:
+                out.append(float(x))
+            except Exception:
+                out.append(None)
+        return out
+    except Exception:
+        return None
+
+
+def _dti_dl_from_cl_v1(ell: list, cl_values: list) -> Optional[list]:
+    try:
+        if not ell or not cl_values:
+            return None
+        n = min(len(ell), len(cl_values))
+        out = []
+        for i in range(n):
+            l = ell[i]
+            c = cl_values[i]
+            if l is None or c is None:
+                out.append(None)
+            else:
+                out.append(float(l) * (float(l) + 1.0) * float(c) / (2.0 * math.pi))
+        return out
+    except Exception:
+        return None
+
+
+def _dti_extract_cmb_cls_payload_v1(cosmo: Any, lmax: int = 2500) -> Dict[str, Any]:
+    """Extract JSON-safe CMB arrays from CLASS.
+
+    Returns empty dict if spectra are unavailable.
+    cl_tt/cl_te/cl_ee are raw CLASS C_l arrays.
+    dl_tt/dl_te/dl_ee are D_l = l(l+1)C_l/(2pi) convenience arrays.
+    cl_pp is returned raw if CLASS provides a lensing/phi-phi-like field.
+    """
+    payload: Dict[str, Any] = {}
+
+    cls = None
+    cls_source = None
+
+    try:
+        cls = cosmo.lensed_cl(lmax)
+        cls_source = "lensed_cl"
+    except Exception:
+        try:
+            cls = cosmo.raw_cl(lmax)
+            cls_source = "raw_cl"
+        except Exception as exc:
+            return {
+                "cmb_array_export_status": "unavailable",
+                "cmb_array_export_error": repr(exc),
+            }
+
+    try:
+        keys = list(cls.keys()) if hasattr(cls, "keys") else []
+    except Exception:
+        keys = []
+
+    def get_key(name: str) -> Any:
+        try:
+            return cls[name]
+        except Exception:
+            return None
+
+    ell = _dti_json_float_list_v1(get_key("ell"))
+    if not ell:
+        return {
+            "cmb_array_export_status": "unavailable",
+            "cmb_array_export_error": "CLASS returned no ell array",
+            "cmb_array_source": cls_source,
+            "cmb_array_keys": keys,
+        }
+
+    payload["cmb_array_export_status"] = "ok"
+    payload["cmb_array_source"] = cls_source
+    payload["cmb_array_lmax_requested"] = int(lmax)
+    payload["cmb_array_keys"] = keys
+    payload["cmb_array_convention"] = (
+        "cl_tt/cl_te/cl_ee are raw CLASS C_l arrays when available; "
+        "dl_tt/dl_te/dl_ee are D_l = l(l+1)C_l/(2pi); "
+        "cl_pp is raw lensing/phi-phi-like output when available."
+    )
+    payload["ell"] = ell
+
+    tt = _dti_json_float_list_v1(get_key("tt"))
+    te = _dti_json_float_list_v1(get_key("te"))
+    ee = _dti_json_float_list_v1(get_key("ee"))
+
+    if tt:
+        payload["cl_tt"] = tt
+        dl_tt = _dti_dl_from_cl_v1(ell, tt)
+        if dl_tt:
+            payload["dl_tt"] = dl_tt
+
+    if te:
+        payload["cl_te"] = te
+        dl_te = _dti_dl_from_cl_v1(ell, te)
+        if dl_te:
+            payload["dl_te"] = dl_te
+
+    if ee:
+        payload["cl_ee"] = ee
+        dl_ee = _dti_dl_from_cl_v1(ell, ee)
+        if dl_ee:
+            payload["dl_ee"] = dl_ee
+
+    for lens_key in ["pp", "phiphi", "dd", "ll"]:
+        lens = _dti_json_float_list_v1(get_key(lens_key))
+        if lens:
+            payload["cl_pp"] = lens
+            payload["cl_pp_source_key"] = lens_key
+            break
+
+    return payload
+# === END DTI_CLASS_API_CMB_ARRAY_EXPORT_V1 ===
+
+
 @app.get("/")
 def root() -> Dict[str, Any]:
     return {
@@ -101,7 +235,9 @@ def class_compute(req: ClassRequest) -> Dict[str, Any]:
         "A_s": A_s,
         "n_s": req.n_s,
         "tau_reio": req.tau_reio,
-        "output": "mPk",
+        "output": "mPk,tCl,pCl,lCl",
+        "lensing": "yes",
+        "l_max_scalars": 2500,
         "P_k_max_h/Mpc": 1.0,
         "z_pk": "0",
     }
@@ -125,6 +261,8 @@ def class_compute(req: ClassRequest) -> Dict[str, Any]:
         except Exception:
             age = None
 
+        cmb_cls_payload = _dti_extract_cmb_cls_payload_v1(cosmo, lmax=2500)
+
         return {
             "status": "ok",
             "engine": "classy/PyCLASS",
@@ -138,12 +276,17 @@ def class_compute(req: ClassRequest) -> Dict[str, Any]:
                 "S8_CLASS": s8,
                 "rs_drag_Mpc_CLASS": rs_drag,
                 "age_Gyr_CLASS": age,
+                **cmb_cls_payload,
             },
             "boundary": {
                 "likelihood_evaluation": False,
                 "posterior_comparison": False,
                 "canonical_checkpoint_update": False,
-                "note": "LCDM-like CLASS propagation only. f_EDE and z_c are accepted for interface compatibility but are not used as AxiCLASS EDE microphysics in this minimal backend.",
+                "cmb_array_export": True,
+                "cmb_graph_readiness_possible": True,
+                "planck_likelihood_evaluation": False,
+                "posterior_comparison": False,
+                "note": "LCDM-like CLASS propagation with real CLASS CMB array export enabled when PyCLASS provides spectra. f_EDE and z_c are accepted for interface compatibility but are not used as AxiCLASS EDE microphysics in this minimal backend. Planck likelihoods are not evaluated.",
             },
         }
     except Exception as exc:
