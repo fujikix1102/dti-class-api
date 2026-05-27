@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import math
 import time
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Tuple, Optional
 
 from fastapi import FastAPI
 from pydantic import BaseModel, Field
@@ -307,3 +307,204 @@ def class_compute(req: ClassRequest) -> Dict[str, Any]:
             cosmo.empty()
         except Exception:
             pass
+
+# === DTI_JUMP_TRANSLATOR_STUB_LOCAL_PATCH_V1 ===
+# Local backend-only translator stub.
+# This endpoint validates and normalizes jump parameters only.
+# It does not call CLASS, does not call AxiCLASS, does not generate CMB spectra,
+# does not evaluate Planck likelihoods, and does not compare posteriors.
+
+def _dti_is_finite_number_v1(value: Any) -> bool:
+    try:
+        x = float(value)
+    except (TypeError, ValueError):
+        return False
+    return math.isfinite(x)
+
+
+def _dti_jump_translation_boundary_v1() -> Dict[str, bool]:
+    return {
+        "fake_arrays": False,
+        "synthetic_graph": False,
+        "cmb_spectra_generated": False,
+        "class_run": False,
+        "axiclass_run": False,
+        "planck_chi2": False,
+        "likelihood_evaluation": False,
+        "posterior_comparison": False,
+        "ede_microphysics_activation_claim": False,
+        "physics_value_update": False,
+        "manuscript_update": False,
+        "canonical_checkpoint_update": False,
+    }
+
+
+def _dti_jump_translation_status_v1() -> Dict[str, bool]:
+    return {
+        "endpoint_implemented": True,
+        "translator_schema_frozen": True,
+        "backend_patch_applied": True,
+        "class_c_patch_applied": False,
+        "axiclass_patch_applied": False,
+        "jump_model_active": False,
+        "jump_background_active": False,
+        "jump_perturbations_active": False,
+        "jump_background_backend_implemented": False,
+        "jump_perturbation_backend_implemented": False,
+    }
+
+
+def _dti_validate_jump_translation_payload_v1(payload: Dict[str, Any]) -> Tuple[List[str], List[str]]:
+    errors: List[str] = []
+    warnings: List[str] = []
+
+    required = [
+        "backend_mode",
+        "H0",
+        "omega_b",
+        "omega_cdm",
+        "ln10_10_As",
+        "n_s",
+        "tau_reio",
+        "jump_model_enabled",
+        "jump_target",
+        "transition_form",
+        "A_J",
+        "z_J",
+        "Delta_z",
+        "jump_regime_label",
+        "request_claim_level",
+    ]
+
+    for key in required:
+        if key not in payload:
+            errors.append(f"missing_required_field:{key}")
+
+    if errors:
+        warnings.append("translation_only: validation stopped after missing required fields")
+        return errors, warnings
+
+    if payload.get("backend_mode") != "jump_parameter_translation_only":
+        errors.append("backend_mode_must_be_jump_parameter_translation_only")
+
+    if payload.get("request_claim_level") != "translation_only":
+        errors.append("request_claim_level_must_be_translation_only")
+
+    if not isinstance(payload.get("jump_model_enabled"), bool):
+        errors.append("jump_model_enabled_must_be_boolean")
+
+    if payload.get("jump_target") not in {"E_z", "H_z"}:
+        errors.append("jump_target_must_be_E_z_or_H_z")
+
+    if payload.get("transition_form") != "smoothed_tanh_step":
+        errors.append("transition_form_must_be_smoothed_tanh_step")
+
+    if payload.get("jump_regime_label") not in {
+        "low_z_geometry",
+        "recombination_scale",
+        "early_time_ede_like",
+    }:
+        errors.append("jump_regime_label_not_allowed")
+
+    positive_fields = ["H0", "omega_b", "omega_cdm", "n_s", "z_J", "Delta_z"]
+    for key in positive_fields:
+        if not _dti_is_finite_number_v1(payload.get(key)) or float(payload.get(key)) <= 0.0:
+            errors.append(f"{key}_must_be_finite_positive")
+
+    finite_fields = ["ln10_10_As", "A_J"]
+    for key in finite_fields:
+        if not _dti_is_finite_number_v1(payload.get(key)):
+            errors.append(f"{key}_must_be_finite")
+
+    if not _dti_is_finite_number_v1(payload.get("tau_reio")) or float(payload.get("tau_reio")) < 0.0:
+        errors.append("tau_reio_must_be_finite_nonnegative")
+
+    if _dti_is_finite_number_v1(payload.get("A_J")):
+        a_j = float(payload.get("A_J"))
+        if abs(a_j) > 0.05:
+            warnings.append("abs_A_J_large: numerical safety is not established")
+
+    if _dti_is_finite_number_v1(payload.get("Delta_z")):
+        delta_z = float(payload.get("Delta_z"))
+        if delta_z <= 1.0:
+            warnings.append("Delta_z_small: transition approaches a discontinuity")
+
+    if _dti_is_finite_number_v1(payload.get("z_J")):
+        z_j = float(payload.get("z_J"))
+        if 800.0 <= z_j <= 1400.0:
+            warnings.append("recombination_scale: perturbation-sector implementation is required before any CMB jump claim")
+
+    regime = payload.get("jump_regime_label")
+    if regime == "low_z_geometry":
+        warnings.append("low_z_geometry: background geometry diagnostic only")
+    elif regime == "early_time_ede_like":
+        warnings.append("early_time_ede_like: this endpoint does not activate EDE or AxiCLASS microphysics")
+    elif regime == "recombination_scale":
+        warnings.append("recombination_scale: no recombination or perturbation modification is implemented")
+
+    warnings.append("translation_only: no CLASS or AxiCLASS run was performed")
+    warnings.append("current public CMB graph remains LCDM-like until jump-aware backend implementation exists")
+    warnings.append("no Planck likelihood evaluation was performed")
+    warnings.append("no posterior comparison was performed")
+
+    return errors, warnings
+
+
+def _dti_normalize_jump_translation_payload_v1(payload: Dict[str, Any]) -> Dict[str, Any]:
+    a_j = float(payload["A_J"])
+    z_j = float(payload["z_J"])
+    delta_z = float(payload["Delta_z"])
+
+    return {
+        "backend_mode": "jump_parameter_translation_only",
+        "jump_model_enabled_requested": bool(payload["jump_model_enabled"]),
+        "jump_target": str(payload["jump_target"]),
+        "transition_form": "smoothed_tanh_step",
+        "A_J": a_j,
+        "z_J": z_j,
+        "Delta_z": delta_z,
+        "J_high_z_limit": 1.0 + a_j,
+        "jump_regime_label": str(payload["jump_regime_label"]),
+        "H0": float(payload["H0"]),
+        "omega_b": float(payload["omega_b"]),
+        "omega_cdm": float(payload["omega_cdm"]),
+        "ln10_10_As": float(payload["ln10_10_As"]),
+        "n_s": float(payload["n_s"]),
+        "tau_reio": float(payload["tau_reio"]),
+    }
+
+
+@app.post("/class/translate-jump-params")
+def translate_jump_params(payload: Dict[str, Any]) -> Dict[str, Any]:
+    errors, warnings = _dti_validate_jump_translation_payload_v1(payload)
+    accepted = len(errors) == 0
+
+    normalized: Dict[str, Any]
+    if accepted:
+        normalized = _dti_normalize_jump_translation_payload_v1(payload)
+    else:
+        normalized = {}
+
+    return {
+        "accepted": accepted,
+        "errors": errors,
+        "warnings": warnings,
+        "normalized": normalized,
+        "formula": {
+            "S_z": "0.5*(1+tanh((z-z_J)/Delta_z))",
+            "J_z": "1 + A_J*S_z",
+            "E_jump_z": "J_z*E_base_z",
+            "target_variable": "E(z)=H(z)/H0",
+        },
+        "implementation_status": _dti_jump_translation_status_v1(),
+        "boundary": _dti_jump_translation_boundary_v1(),
+        "next_allowed_stage": "background_only_backend_plan_or_explicit_local_patch",
+        "note": (
+            "Translator-only endpoint. No CLASS run, no AxiCLASS run, no CMB spectra, "
+            "no Planck chi2, no likelihood evaluation, and no posterior comparison."
+        ),
+    }
+
+
+# === END DTI_JUMP_TRANSLATOR_STUB_LOCAL_PATCH_V1 ===
+
