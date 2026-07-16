@@ -70,3 +70,26 @@ Boundary:
 - not a likelihood evaluation
 - not a posterior comparison
 - not a Planck validation pipeline
+
+## AxiCLASS + Cobaya DESI DR2 BAO endpoint
+
+Bounded endpoints:
+
+- `GET /axiclass/desi-dr2-bao/health`
+- `GET /axiclass/desi-dr2-bao/provenance`
+- `POST /axiclass/desi-dr2-bao`
+
+The POST endpoint currently accepts only the locked Planck-2018-baseline-like
+parameter contract. It executes the pinned Linux AxiCLASS build through a
+Cobaya Theory provider and evaluates the inherited DESI DR2 BAO `theory_fun`
+and `logp` methods using explicitly bound frozen mean and covariance files.
+
+Boundaries:
+
+- no sampler;
+- no posterior;
+- no MCMC;
+- no historical-chain reproduction;
+- no normalized likelihood claim;
+- no EDE-branch claim;
+- no reuse of 30.06.

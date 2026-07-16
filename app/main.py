@@ -508,3 +508,9 @@ def translate_jump_params(payload: Dict[str, Any]) -> Dict[str, Any]:
 
 # === END DTI_JUMP_TRANSLATOR_STUB_LOCAL_PATCH_V1 ===
 
+# === DTI_AXICLASS_DESI_DR2_BAO_ROUTER_V1 ===
+from app.physical_bao import router as physical_bao_router
+
+app.include_router(physical_bao_router)
+# === END DTI_AXICLASS_DESI_DR2_BAO_ROUTER_V1 ===
+
