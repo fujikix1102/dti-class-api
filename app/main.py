@@ -514,3 +514,40 @@ from app.physical_bao import router as physical_bao_router
 app.include_router(physical_bao_router)
 # === END DTI_AXICLASS_DESI_DR2_BAO_ROUTER_V1 ===
 
+# === DTI_PHYSICAL_BAO_FASTAPI_ROUTE_BINDING_V1 BEGIN ===
+# Dedicated bounded physical-provider namespace.
+# This does not modify /class/compute.
+# No sampler, posterior, MCMC, or historical-chain reproduction is run.
+
+from fastapi import Request as _DTIPhysicalBAORequestV1
+
+from app.physical_bao import (
+    physical_bao_compute as _dti_physical_bao_compute_v1,
+    physical_bao_health as _dti_physical_bao_health_v1,
+    physical_bao_provenance as _dti_physical_bao_provenance_v1,
+)
+
+
+@app.get("/axiclass/desi-dr2-bao")
+def dti_physical_bao_root_v1() -> Dict[str, Any]:
+    return _dti_physical_bao_health_v1()
+
+
+@app.get("/axiclass/desi-dr2-bao/health")
+def dti_physical_bao_health_v1() -> Dict[str, Any]:
+    return _dti_physical_bao_health_v1()
+
+
+@app.get("/axiclass/desi-dr2-bao/provenance")
+def dti_physical_bao_provenance_v1() -> Dict[str, Any]:
+    return _dti_physical_bao_provenance_v1()
+
+
+@app.post("/axiclass/desi-dr2-bao")
+def dti_physical_bao_compute_v1(
+    request: _DTIPhysicalBAORequestV1,
+) -> Dict[str, Any]:
+    return _dti_physical_bao_compute_v1(request)
+
+# === DTI_PHYSICAL_BAO_FASTAPI_ROUTE_BINDING_V1 END ===
+
